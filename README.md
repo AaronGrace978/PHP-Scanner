@@ -16,10 +16,14 @@ This is the kind of code it is built for. From [`examples/vulnerable-app`](examp
 $id = $_GET['id'];
 $result = $db->query("SELECT * FROM products WHERE id = " . $id);
 
-echo "<h1>Hello " . $_POST['name'] . "</h1>";
+$name = $_POST['name'] ?? '';
+echo "<h1>Hello " . $name . "</h1>";
 
-system("ping -c 1 " . $_GET['host']);
-include "pages/" . $_GET['page'] . ".php";
+$host = $_GET['host'];
+system("ping -c 1 " . $host);
+
+$page = $_GET['page'];
+include "pages/" . $page . ".php";
 ```
 
 `php-scanner scan examples/vulnerable-app` reports that file as SQL injection, cross-site scripting, command injection and local file inclusion, each with the line and the path the input took. The same demo also ships a web shell, a weak `md5()` password hash, a PHP 8.3.30 Docker image, and a `.user.ini` mitigation that PHP says does not work. The scan ends **action required**.
