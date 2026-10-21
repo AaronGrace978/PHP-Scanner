@@ -156,7 +156,9 @@ export function AdvisoryView({ db, report, onOpenFindings, onError }: Props) {
               }
             >
               {local.length === 0 ? (
-                <p className="muted">{probed ? "No PHP binaries found in PATH." : "Not probed yet."}</p>
+                <p className="muted">
+                  {probed || ar ? "No PHP binaries found in PATH (or probing was disabled for the scan)." : "Not probed yet."}
+                </p>
               ) : (
                 <table className="table">
                   <thead>

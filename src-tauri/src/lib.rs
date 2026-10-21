@@ -58,7 +58,10 @@ async fn scan(
     scanner.probe_local_runtimes = check_local_runtime;
     if let Some(b) = baseline_path.filter(|b| !b.is_empty()) {
         let text = std::fs::read_to_string(&b).map_err(|e| format!("baseline {b}: {e}"))?;
-        scanner.baseline = Some(serde_json::from_str::<Baseline>(&text).map_err(|e| format!("invalid baseline: {e}"))?);
+        scanner.baseline = Some(
+            serde_json::from_str::<Baseline>(&text)
+                .map_err(|e| format!("invalid baseline: {e}"))?,
+        );
     }
     *state.cancel.lock().unwrap() = Some(scanner.cancel_token());
 
@@ -103,8 +106,16 @@ fn write_baseline(state: State<'_, AppState>, path: String) -> Result<usize, Str
 #[tauri::command]
 fn read_source(root: String, file: String) -> Result<String, String> {
     let root = PathBuf::from(root).canonicalize().map_err(err)?;
-    let base = if root.is_file() { root.parent().map(Path::to_path_buf).unwrap_or(root.clone()) } else { root.clone() };
-    let target = if root.is_file() { root.clone() } else { base.join(&file) };
+    let base = if root.is_file() {
+        root.parent().map(Path::to_path_buf).unwrap_or(root.clone())
+    } else {
+        root.clone()
+    };
+    let target = if root.is_file() {
+        root.clone()
+    } else {
+        base.join(&file)
+    };
     let target = target.canonicalize().map_err(err)?;
     if !target.starts_with(&base) {
         return Err("file is outside the scanned directory".into());
@@ -121,14 +132,22 @@ fn read_source(root: String, file: String) -> Result<String, String> {
 async fn probe_runtimes() -> Result<Vec<LocalRuntime>, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let db = AdvisoryDb::builtin();
-        db.advisories.iter().flat_map(advisory::probe_local_runtimes).collect()
+        db.advisories
+            .iter()
+            .flat_map(advisory::probe_local_runtimes)
+            .collect()
     })
     .await
     .map_err(err)
 }
 
 fn integrity_config() -> ScanConfig {
-    ScanConfig { respect_gitignore: false, include_hidden: true, scan_dependencies: true, ..Default::default() }
+    ScanConfig {
+        respect_gitignore: false,
+        include_hidden: true,
+        scan_dependencies: true,
+        ..Default::default()
+    }
 }
 
 #[tauri::command]
@@ -146,7 +165,8 @@ async fn integrity_snapshot(path: String, output: String) -> Result<usize, Strin
 async fn integrity_verify(path: String, manifest: String) -> Result<IntegrityReport, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let text = std::fs::read_to_string(&manifest).map_err(err)?;
-        let m: Manifest = serde_json::from_str(&text).map_err(|e| format!("invalid manifest: {e}"))?;
+        let m: Manifest =
+            serde_json::from_str(&text).map_err(|e| format!("invalid manifest: {e}"))?;
         integrity::verify(Path::new(&path), &integrity_config(), &m)
     })
     .await
