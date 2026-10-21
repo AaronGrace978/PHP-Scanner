@@ -1,16 +1,45 @@
 # PHP Scanner
 
-A fast, offline static security scanner for PHP applications, shipped as a **desktop app** (Tauri 2 + React) and a **CLI** for CI pipelines. Both share one Rust engine.
+<p align="center">
+  <img src="docs/php-scanner-banner.jpg" alt="PHP Scanner: a shield beside a critical finding on a SQL query built from $_GET" width="100%">
+</p>
 
-- **Taint analysis**: tracks user input (superglobals, `php://input`, `$_SERVER['HTTP_*']`, Laravel/Symfony request objects) into SQL, shell, `eval`, include, file, SSRF, redirect, header, LDAP, XPath, regex, deserialization and XSS sinks. It understands sanitizers, escaping in quoted SQL, and branches/loops, and builds per-file function summaries.
-- **Dangerous APIs and configuration**: weak hashing and crypto, insecure randomness, disabled TLS verification, loose comparisons on tokens, XXE, `display_errors`, `phpinfo()`, permissive `chmod`, `mysql_*`.
-- **Secrets**: AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, Twilio, private keys, DB URLs and hard-coded credentials. Values are masked in every report.
-- **Malware and web shells**: known shell signatures, `eval($_POST…)` backdoors, obfuscated execution, encoded payloads, and PHP files in upload directories.
-- **php2shell response** (NSA / CISA / NCSC advisory, 21 Oct 2026). See below.
-- **Integrity manifests**: SHA-256 known-good snapshots, which are verified later to find added or modified files.
-- **Reports**: HTML, SARIF 2.1.0 (GitHub code scanning), JSON and CSV. Supports baselines and inline suppressions.
+A free, offline scanner for PHP projects. It reads your source, follows user input into dangerous calls, and tells you whether the PHP runtime itself is exposed to [php2shell](#php2shell-cve-2026-109618--cve-2026-109619). One Rust engine powers a desktop app and a command-line tool for CI.
 
-Scanning WordPress core (about 2,000 files and 700k lines) takes about 1.6 s on 4 cores.
+It is free to use. MIT licensed. Nothing is uploaded.
+
+## What it reads
+
+This is the kind of code it is built for. From [`examples/vulnerable-app`](examples/vulnerable-app/public/index.php):
+
+```php
+$id = $_GET['id'];
+$result = $db->query("SELECT * FROM products WHERE id = " . $id);
+
+echo "<h1>Hello " . $_POST['name'] . "</h1>";
+
+system("ping -c 1 " . $_GET['host']);
+include "pages/" . $_GET['page'] . ".php";
+```
+
+`php-scanner scan examples/vulnerable-app` reports that file as SQL injection, cross-site scripting, command injection and local file inclusion, each with the line and the path the input took. The same demo also ships a web shell, a weak `md5()` password hash, a PHP 8.3.30 Docker image, and a `.user.ini` mitigation that PHP says does not work. The scan ends **action required**.
+
+Escaping that actually works is left alone:
+
+```php
+$safe = htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8');
+echo "<p>You searched for {$safe}</p>";
+```
+
+| It looks for | Examples |
+|---|---|
+| Tainted input reaching a sink | SQL, shell, `eval`, `include`, files, SSRF, redirects, headers, LDAP, XPath, regex, `unserialize`, XSS |
+| Dangerous APIs and config | Weak hashes and ciphers, `rand()` for secrets, TLS verification off, `==` on tokens, XXE, `display_errors`, `phpinfo()`, `chmod 0777`, `mysql_*` |
+| Secrets | AWS, GitHub, Slack, Stripe, Google, OpenAI, private keys, database URLs. Values are masked in every report |
+| Malware | Known web shells, `eval($_POST…)`, encoded payloads, PHP dropped in an upload directory |
+| php2shell | Runtime pins, ineffective mitigations, local PHP binaries, signs of compromise |
+
+WordPress core, about 2,000 files and 700k lines, scans in about 1.6 seconds. Reports come out as HTML, SARIF 2.1.0, JSON or CSV.
 
 ## php2shell (CVE-2026-109618 / CVE-2026-109619)
 
@@ -75,7 +104,11 @@ php-scanner advisories                             # bundled advisory database
 
 Exit codes: `0` clean, `1` findings at or above `--fail-on` (or php2shell action required), `2` error.
 
-Try it on the bundled demo with `php-scanner scan examples/vulnerable-app`.
+The same command against the demo:
+
+```bash
+php-scanner scan examples/vulnerable-app
+```
 
 ### GitHub Actions
 
