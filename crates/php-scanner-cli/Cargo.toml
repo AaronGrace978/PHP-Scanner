@@ -1,0 +1,22 @@
+[package]
+name = "php-scanner-cli"
+description = "Command-line interface for PHP Scanner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "php-scanner"
+path = "src/main.rs"
+
+[dependencies]
+php-scanner-core = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+tempfile = "3"

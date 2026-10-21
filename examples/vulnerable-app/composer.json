@@ -1,0 +1,11 @@
+{
+    "name": "example/vulnerable-app",
+    "require": {
+        "php": "^8.3"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3.30"
+        }
+    }
+}
