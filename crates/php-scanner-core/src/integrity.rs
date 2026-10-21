@@ -2,8 +2,8 @@
 //! "Known-Good Comparison"): snapshot file hashes of a verified deployment and
 //! later report files that were added, modified or removed.
 
-use crate::discovery::{walk_all, DiscoveredFile};
 use crate::config::ScanConfig;
+use crate::discovery::{walk_all, DiscoveredFile};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -64,7 +64,10 @@ fn hash_file(path: &Path) -> std::io::Result<(String, u64, bool)> {
             break;
         }
         if first {
-            php_tag = buf[..n].windows(5).any(|w| w.eq_ignore_ascii_case(b"<?php")) || buf[..n].windows(3).any(|w| w == b"<?=");
+            php_tag = buf[..n]
+                .windows(5)
+                .any(|w| w.eq_ignore_ascii_case(b"<?php"))
+                || buf[..n].windows(3).any(|w| w == b"<?=");
             first = false;
         }
         size += n as u64;
@@ -93,7 +96,11 @@ pub fn create_manifest(root: &Path, cfg: &ScanConfig) -> Result<Manifest, String
     })
 }
 
-pub fn verify(root: &Path, cfg: &ScanConfig, manifest: &Manifest) -> Result<IntegrityReport, String> {
+pub fn verify(
+    root: &Path,
+    cfg: &ScanConfig,
+    manifest: &Manifest,
+) -> Result<IntegrityReport, String> {
     let mut report = IntegrityReport {
         manifest_created_at: manifest.created_at.clone(),
         files_checked: 0,
@@ -103,19 +110,33 @@ pub fn verify(root: &Path, cfg: &ScanConfig, manifest: &Manifest) -> Result<Inte
     };
     let mut seen = std::collections::HashSet::new();
     for f in walk_all(root, cfg)? {
-        let Ok((sha, _, php_tag)) = hash_file(&f.path) else { continue };
+        let Ok((sha, _, php_tag)) = hash_file(&f.path) else {
+            continue;
+        };
         report.files_checked += 1;
         seen.insert(f.rel.clone());
         let exec = is_executable(&f, cfg, php_tag);
         match manifest.files.get(&f.rel) {
-            None => report.added.push(IntegrityChange { path: f.rel.clone(), change: "added".into(), executable: exec }),
-            Some(e) if e.sha256 != sha => report.modified.push(IntegrityChange { path: f.rel.clone(), change: "modified".into(), executable: exec }),
+            None => report.added.push(IntegrityChange {
+                path: f.rel.clone(),
+                change: "added".into(),
+                executable: exec,
+            }),
+            Some(e) if e.sha256 != sha => report.modified.push(IntegrityChange {
+                path: f.rel.clone(),
+                change: "modified".into(),
+                executable: exec,
+            }),
             _ => {}
         }
     }
     for path in manifest.files.keys() {
         if !seen.contains(path) {
-            report.removed.push(IntegrityChange { path: path.clone(), change: "removed".into(), executable: false });
+            report.removed.push(IntegrityChange {
+                path: path.clone(),
+                change: "removed".into(),
+                executable: false,
+            });
         }
     }
     for list in [&mut report.added, &mut report.modified] {
@@ -145,7 +166,10 @@ mod tests {
 
         let r = verify(p, &cfg, &m).unwrap();
         assert_eq!(r.added.len(), 1);
-        assert!(r.added[0].executable, "php hidden in an image must be flagged executable");
+        assert!(
+            r.added[0].executable,
+            "php hidden in an image must be flagged executable"
+        );
         assert_eq!(r.modified.len(), 1);
         assert_eq!(r.removed.len(), 1);
         assert!(!r.is_clean());

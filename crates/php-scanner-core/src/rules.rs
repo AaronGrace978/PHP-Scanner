@@ -2,6 +2,7 @@ use crate::finding::{Category, Severity};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Rule {
     pub id: &'static str,
     pub title: &'static str,

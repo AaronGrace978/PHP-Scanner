@@ -72,7 +72,8 @@ impl AdvisoryDb {
 
     pub fn from_file(path: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        serde_json::from_str(&text).map_err(|e| format!("{}: invalid advisory database: {e}", path.display()))
+        serde_json::from_str(&text)
+            .map_err(|e| format!("{}: invalid advisory database: {e}", path.display()))
     }
 }
 
@@ -130,7 +131,11 @@ impl Advisory {
     }
 
     pub fn fixed_list(&self) -> String {
-        self.fixed.iter().map(|f| f.version.as_str()).collect::<Vec<_>>().join(", ")
+        self.fixed
+            .iter()
+            .map(|f| f.version.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     pub fn evaluate(&self, v: &PhpVersion) -> RuntimeStatus {
@@ -145,7 +150,12 @@ impl Advisory {
                 None => RuntimeStatus::Unverified,
             },
             None => {
-                let newest = self.fixed.iter().filter_map(|f| Self::branch_of(&f.branch)).max().unwrap_or((0, 0));
+                let newest = self
+                    .fixed
+                    .iter()
+                    .filter_map(|f| Self::branch_of(&f.branch))
+                    .max()
+                    .unwrap_or((0, 0));
                 if v.branch() > newest {
                     RuntimeStatus::Patched
                 } else {
@@ -208,17 +218,44 @@ pub fn classify(rel_path: &str) -> Option<ConfigKind> {
     Some(match name {
         "composer.json" => ConfigKind::ComposerJson,
         "dockerfile" | "containerfile" => ConfigKind::Dockerfile,
-        n if n.starts_with("dockerfile.") || n.ends_with(".dockerfile") || n.ends_with(".containerfile") => ConfigKind::Dockerfile,
+        n if n.starts_with("dockerfile.")
+            || n.ends_with(".dockerfile")
+            || n.ends_with(".containerfile") =>
+        {
+            ConfigKind::Dockerfile
+        }
         ".php-version" => ConfigKind::VersionFile,
         ".tool-versions" => ConfigKind::ToolVersions,
         ".user.ini" => ConfigKind::PerDirIni,
         ".htaccess" => ConfigKind::Htaccess,
-        "php.ini" | "php.ini-production" | "php.ini-development" | "php-fpm.conf" => ConfigKind::PhpIni,
-        n if n.ends_with(".ini") && (n.contains("php") || lower.contains("php") || in_dir("conf.d")) => ConfigKind::PhpIni,
-        n if n.ends_with(".conf") && (in_dir("php-fpm.d") || in_dir("pool.d") || n == "www.conf") => ConfigKind::FpmPool,
-        n if n.ends_with(".conf") && (lower.contains("apache") || lower.contains("httpd") || lower.contains("nginx") || n.contains("php")) => ConfigKind::ServerConf,
+        "php.ini" | "php.ini-production" | "php.ini-development" | "php-fpm.conf" => {
+            ConfigKind::PhpIni
+        }
+        n if n.ends_with(".ini")
+            && (n.contains("php") || lower.contains("php") || in_dir("conf.d")) =>
+        {
+            ConfigKind::PhpIni
+        }
+        n if n.ends_with(".conf")
+            && (in_dir("php-fpm.d") || in_dir("pool.d") || n == "www.conf") =>
+        {
+            ConfigKind::FpmPool
+        }
+        n if n.ends_with(".conf")
+            && (lower.contains("apache")
+                || lower.contains("httpd")
+                || lower.contains("nginx")
+                || n.contains("php")) =>
+        {
+            ConfigKind::ServerConf
+        }
         n if n.ends_with(".service") => ConfigKind::SystemdUnit,
-        n if n.ends_with(".sh") || n.starts_with("entrypoint") || n.starts_with("docker-entrypoint") => ConfigKind::Shell,
+        n if n.ends_with(".sh")
+            || n.starts_with("entrypoint")
+            || n.starts_with("docker-entrypoint") =>
+        {
+            ConfigKind::Shell
+        }
         n if n.ends_with(".yml") || n.ends_with(".yaml") => ConfigKind::Yaml,
         _ => return None,
     })
@@ -228,20 +265,53 @@ static IMAGE_LINE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"(?im)^\s*(?:from\s+(?:--platform=\S+\s+)?|-?\s*image:\s*|type:\s*)['"]?([a-z0-9][a-z0-9._/:@${}\-]*)"#).unwrap()
 });
 static TAG_PHP: Lazy<Regex> = Lazy::new(|| Regex::new(r"php-?(\d+\.\d+(?:\.\d+)?)").unwrap());
-static ARG_LINE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?im)^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)=([^\s]+)").unwrap());
+static ARG_LINE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?im)^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)=([^\s]+)").unwrap());
 static PKG_LINE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(apt-get|apt|apk|yum|dnf|zypper|microdnf)\b[^\n]*\binstall|apk\s+add").unwrap()
 });
-static PKG_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\bphp(\d)\.?(\d)(?:-[a-z0-9]+)?\b").unwrap());
-static GAE_RUNTIME: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?im)^\s*runtime:\s*['\x22]?php(\d)(\d)\b").unwrap());
-static RLIMIT_UNIT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?im)^\s*Limit(AS|DATA)\s*=\s*(\S+)").unwrap());
-static RLIMIT_ULIMIT: Lazy<Regex> = Lazy::new(|| Regex::new(r"\bulimit\s+(?:-[A-Za-z]*\s+)*-([A-Za-z]*[vd][A-Za-z]*)\s+(\d+)").unwrap());
+static PKG_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\bphp(\d)\.?(\d)(?:-[a-z0-9]+)?\b").unwrap());
+static GAE_RUNTIME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?im)^\s*runtime:\s*['\x22]?php(\d)(\d)\b").unwrap());
+static RLIMIT_UNIT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?im)^\s*Limit(AS|DATA)\s*=\s*(\S+)").unwrap());
+static RLIMIT_ULIMIT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\bulimit\s+(?:-[A-Za-z]*\s+)*-([A-Za-z]*[vd][A-Za-z]*)\s+(\d+)").unwrap()
+});
 
 const PHP_BUNDLING_IMAGES: &[&str] = &[
-    "wordpress", "drupal", "joomla", "nextcloud", "matomo", "phpmyadmin", "mediawiki", "magento",
-    "prestashop", "moodle", "owncloud", "roundcube", "mautic", "kanboard", "bookstack", "grav",
-    "craftcms", "statamic", "sylius", "shopware", "typo3", "concrete5", "opencart", "phpbb", "frankenphp",
-    "laravelsail", "sail-8.0", "sail-8.1", "sail-8.2", "sail-8.3", "sail-8.4",
+    "wordpress",
+    "drupal",
+    "joomla",
+    "nextcloud",
+    "matomo",
+    "phpmyadmin",
+    "mediawiki",
+    "magento",
+    "prestashop",
+    "moodle",
+    "owncloud",
+    "roundcube",
+    "mautic",
+    "kanboard",
+    "bookstack",
+    "grav",
+    "craftcms",
+    "statamic",
+    "sylius",
+    "shopware",
+    "typo3",
+    "concrete5",
+    "opencart",
+    "phpbb",
+    "frankenphp",
+    "laravelsail",
+    "sail-8.0",
+    "sail-8.1",
+    "sail-8.2",
+    "sail-8.3",
+    "sail-8.4",
 ];
 
 fn line_at(starts: &[usize], offset: usize) -> usize {
@@ -270,8 +340,20 @@ impl<'a> Ctx<'a> {
         });
     }
 
-    fn runtime(&mut self, row: usize, kind: &str, reference: &str, version: Option<PhpVersion>, forced: Option<RuntimeStatus>, note: String) {
-        let status = forced.unwrap_or_else(|| version.map(|v| self.adv.evaluate(&v)).unwrap_or(RuntimeStatus::Unverified));
+    fn runtime(
+        &mut self,
+        row: usize,
+        kind: &str,
+        reference: &str,
+        version: Option<PhpVersion>,
+        forced: Option<RuntimeStatus>,
+        note: String,
+    ) {
+        let status = forced.unwrap_or_else(|| {
+            version
+                .map(|v| self.adv.evaluate(&v))
+                .unwrap_or(RuntimeStatus::Unverified)
+        });
         let adv = self.adv;
         let fixed = adv.fixed_list();
         let vtext = version.map(|v| v.to_string());
@@ -310,8 +392,19 @@ impl<'a> Ctx<'a> {
 }
 
 /// Analyses a non-PHP configuration file against an advisory.
-pub fn check_config(adv: &Advisory, kind: ConfigKind, rel: &str, src: &str, starts: &[usize]) -> ConfigResult {
-    let mut cx = Ctx { adv, rel, starts, out: ConfigResult::default() };
+pub fn check_config(
+    adv: &Advisory,
+    kind: ConfigKind,
+    rel: &str,
+    src: &str,
+    starts: &[usize],
+) -> ConfigResult {
+    let mut cx = Ctx {
+        adv,
+        rel,
+        starts,
+        out: ConfigResult::default(),
+    };
     match kind {
         ConfigKind::ComposerJson => composer(&mut cx, src),
         ConfigKind::Dockerfile => {
@@ -338,12 +431,21 @@ pub fn check_config(adv: &Advisory, kind: ConfigKind, rel: &str, src: &str, star
                 let mut parts = l.split_whitespace();
                 if parts.next() == Some("php") {
                     if let Some(ver) = parts.next() {
-                        cx.runtime(i, "asdf/mise .tool-versions", l.trim(), PhpVersion::parse(ver), None, String::new());
+                        cx.runtime(
+                            i,
+                            "asdf/mise .tool-versions",
+                            l.trim(),
+                            PhpVersion::parse(ver),
+                            None,
+                            String::new(),
+                        );
                     }
                 }
             }
         }
-        ConfigKind::PhpIni | ConfigKind::FpmPool | ConfigKind::ServerConf => ini(&mut cx, src, kind),
+        ConfigKind::PhpIni | ConfigKind::FpmPool | ConfigKind::ServerConf => {
+            ini(&mut cx, src, kind)
+        }
         ConfigKind::PerDirIni | ConfigKind::Htaccess => per_dir(&mut cx, src, kind),
         ConfigKind::SystemdUnit | ConfigKind::Shell => rlimits(&mut cx, src),
     }
@@ -351,19 +453,34 @@ pub fn check_config(adv: &Advisory, kind: ConfigKind, rel: &str, src: &str, star
 }
 
 fn find_row(src: &str, starts: &[usize], needle: &Regex) -> usize {
-    needle.find(src).map(|m| line_at(starts, m.start())).unwrap_or(0)
+    needle
+        .find(src)
+        .map(|m| line_at(starts, m.start()))
+        .unwrap_or(0)
 }
 
 fn composer(cx: &mut Ctx, src: &str) {
-    let Ok(json) = serde_json::from_str::<serde_json::Value>(src) else { return };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(src) else {
+        return;
+    };
     static PHP_KEY: Lazy<Regex> = Lazy::new(|| Regex::new(r#""php"\s*:"#).unwrap());
-    if let Some(pin) = json.pointer("/config/platform/php").and_then(|v| v.as_str()) {
+    if let Some(pin) = json
+        .pointer("/config/platform/php")
+        .and_then(|v| v.as_str())
+    {
         let row = src
             .find("\"platform\"")
             .and_then(|p| PHP_KEY.find_at(src, p))
             .map(|m| line_at(cx.starts, m.start()))
             .unwrap_or(0);
-        cx.runtime(row, "Composer platform pin", pin, PhpVersion::parse(pin), None, String::new());
+        cx.runtime(
+            row,
+            "Composer platform pin",
+            pin,
+            PhpVersion::parse(pin),
+            None,
+            String::new(),
+        );
     }
     if let Some(req) = json.pointer("/require/php").and_then(|v| v.as_str()) {
         let row = find_row(src, cx.starts, &PHP_KEY);
@@ -381,7 +498,12 @@ fn composer(cx: &mut Ctx, src: &str) {
                     v
                 })
             })
-            .find(|v| matches!(cx.adv.evaluate(v), RuntimeStatus::Vulnerable | RuntimeStatus::Unsupported));
+            .find(|v| {
+                matches!(
+                    cx.adv.evaluate(v),
+                    RuntimeStatus::Vulnerable | RuntimeStatus::Unsupported
+                )
+            });
         if let Some(v) = vulnerable_floor {
             cx.finding("php2shell-composer-constraint", Confidence::High, row,
                 format!("\"php\": \"{req}\" accepts PHP {v}, which is affected by {}. Require {} or later.", cx.adv.cves.join(" / "), cx.adv.fixed_list()));
@@ -399,7 +521,9 @@ fn images(cx: &mut Ctx, src: &str, dockerfile: bool) {
     for c in IMAGE_LINE.captures_iter(src) {
         let mut image = c[1].to_string();
         for (k, v) in &args {
-            image = image.replace(&format!("${{{k}}}"), v).replace(&format!("${k}"), v);
+            image = image
+                .replace(&format!("${{{k}}}"), v)
+                .replace(&format!("${k}"), v);
         }
         let row = line_at(cx.starts, c.get(0).unwrap().start());
         let image = image.split('@').next().unwrap_or(&image).to_string();
@@ -407,11 +531,22 @@ fn images(cx: &mut Ctx, src: &str, dockerfile: bool) {
             Some((r, t)) if !t.contains('/') => (r.to_string(), t.to_string()),
             _ => (image.clone(), "latest".to_string()),
         };
-        let base = repo.rsplit('/').next().unwrap_or(&repo).to_ascii_lowercase();
+        let base = repo
+            .rsplit('/')
+            .next()
+            .unwrap_or(&repo)
+            .to_ascii_lowercase();
         let tag_l = tag.to_ascii_lowercase();
-        if base == "php" || base.starts_with("php-") || base.starts_with("php8") || base.starts_with("php7") || base.ends_with("-php") || base == "frankenphp" && tag_l.contains("php") {
+        if base == "php"
+            || base.starts_with("php-")
+            || base.starts_with("php8")
+            || base.starts_with("php7")
+            || base.ends_with("-php")
+            || base == "frankenphp" && tag_l.contains("php")
+        {
             let version = if base.starts_with("php8") || base.starts_with("php7") {
-                PhpVersion::parse(&format!("{}.{}", &base[3..4], &base[4..5])).filter(|_| base.len() >= 5)
+                PhpVersion::parse(&format!("{}.{}", &base[3..4], &base[4..5]))
+                    .filter(|_| base.len() >= 5)
             } else {
                 PhpVersion::parse(&tag_l)
             };
@@ -422,11 +557,28 @@ fn images(cx: &mut Ctx, src: &str, dockerfile: bool) {
             };
             cx.runtime(row, "Container image", &image, version, None, note);
         } else if let Some(m) = TAG_PHP.captures(&tag_l) {
-            cx.runtime(row, "Container image", &image, PhpVersion::parse(&m[1]), None,
-                "Bundled PHP inside an application image; rebuild from the vendor's patched image.".into());
-        } else if PHP_BUNDLING_IMAGES.iter().any(|b| base == *b || base.starts_with(&format!("{b}-"))) {
-            cx.runtime(row, "Container image", &image, None, Some(RuntimeStatus::Unverified),
-                "This image bundles a PHP runtime; pull the vendor's rebuilt image and restart.".into());
+            cx.runtime(
+                row,
+                "Container image",
+                &image,
+                PhpVersion::parse(&m[1]),
+                None,
+                "Bundled PHP inside an application image; rebuild from the vendor's patched image."
+                    .into(),
+            );
+        } else if PHP_BUNDLING_IMAGES
+            .iter()
+            .any(|b| base == *b || base.starts_with(&format!("{b}-")))
+        {
+            cx.runtime(
+                row,
+                "Container image",
+                &image,
+                None,
+                Some(RuntimeStatus::Unverified),
+                "This image bundles a PHP runtime; pull the vendor's rebuilt image and restart."
+                    .into(),
+            );
         }
     }
 }
@@ -455,7 +607,11 @@ fn rlimits(cx: &mut Ctx, src: &str) {
     }
     for c in RLIMIT_ULIMIT.captures_iter(src) {
         let row = line_at(cx.starts, c.get(0).unwrap().start());
-        let which = if c[1].contains('v') { "RLIMIT_AS" } else { "RLIMIT_DATA" };
+        let which = if c[1].contains('v') {
+            "RLIMIT_AS"
+        } else {
+            "RLIMIT_DATA"
+        };
         cx.finding("php2shell-rlimit-misuse", Confidence::Medium, row,
             format!("'{}' sets {which}; PHP warns this can trigger the CVE-2026-109618 vulnerable allocation failure.", c.get(0).unwrap().as_str()));
     }
@@ -465,21 +621,33 @@ fn rlimits(cx: &mut Ctx, src: &str) {
 /// `php_admin_flag directive value` forms. Returns (row, directive, value).
 fn ini_directives(src: &str) -> Vec<(usize, String, String)> {
     static POOL: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"(?i)^\s*php(?:_admin)?_(?:value|flag)\[([a-z0-9_.]+)\]\s*=\s*(.*?)\s*$").unwrap()
+        Regex::new(r"(?i)^\s*php(?:_admin)?_(?:value|flag)\[([a-z0-9_.]+)\]\s*=\s*(.*?)\s*$")
+            .unwrap()
     });
     static APACHE: Lazy<Regex> = Lazy::new(|| {
         Regex::new(r"(?i)^\s*php(?:_admin)?_(?:value|flag)\s+([a-z0-9_.]+)\s+(.*?)\s*$").unwrap()
     });
-    static INI: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^\s*([a-z0-9_.]+)\s*=\s*(.*?)\s*$").unwrap());
+    static INI: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?i)^\s*([a-z0-9_.]+)\s*=\s*(.*?)\s*$").unwrap());
     let mut out = Vec::new();
     for (i, line) in src.lines().enumerate() {
         let t = line.trim_start();
         if t.starts_with(';') || t.starts_with('#') {
             continue;
         }
-        let caps = POOL.captures(line).or_else(|| APACHE.captures(line)).or_else(|| INI.captures(line));
+        let caps = POOL
+            .captures(line)
+            .or_else(|| APACHE.captures(line))
+            .or_else(|| INI.captures(line));
         if let Some(c) = caps {
-            let v = c[2].split(';').next().unwrap_or("").trim().trim_matches('"').trim_matches('\'').to_ascii_lowercase();
+            let v = c[2]
+                .split(';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_ascii_lowercase();
             out.push((i, c[1].to_ascii_lowercase(), v));
         }
     }
@@ -498,7 +666,11 @@ fn ini(cx: &mut Ctx, src: &str, kind: ConfigKind) {
         let set = directives.iter().rev().find(|(_, d, _)| *d == m.directive);
         match set {
             Some((row, _, val)) if !m.safe_values.contains(val) => {
-                let scope = if m.branches.is_empty() { String::new() } else { format!(" (PHP {})", m.branches.join(", ")) };
+                let scope = if m.branches.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (PHP {})", m.branches.join(", "))
+                };
                 cx.finding("php2shell-mitigation-missing", Confidence::High, *row,
                     format!("{} is enabled ('{val}'){scope}; this keeps the {} exploitation path open until PHP is patched.", m.directive, m.cve));
             }
@@ -507,14 +679,29 @@ fn ini(cx: &mut Ctx, src: &str, kind: ConfigKind) {
         }
     }
     if !missing.is_empty() {
-        cx.finding("php2shell-mitigation-missing", Confidence::Medium, 0,
-            format!("{} not disabled here (PHP default is on). Set {} until every runtime is patched.",
-                missing.join(" / "), missing.iter().map(|d| format!("{d}=0")).collect::<Vec<_>>().join(", ")));
+        cx.finding(
+            "php2shell-mitigation-missing",
+            Confidence::Medium,
+            0,
+            format!(
+                "{} not disabled here (PHP default is on). Set {} until every runtime is patched.",
+                missing.join(" / "),
+                missing
+                    .iter()
+                    .map(|d| format!("{d}=0"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        );
     }
 }
 
 fn per_dir(cx: &mut Ctx, src: &str, kind: ConfigKind) {
-    let label = if kind == ConfigKind::Htaccess { ".htaccess" } else { ".user.ini" };
+    let label = if kind == ConfigKind::Htaccess {
+        ".htaccess"
+    } else {
+        ".user.ini"
+    };
     for (row, d, _) in ini_directives(src) {
         if cx.adv.ini_mitigations.iter().any(|m| m.directive == d) {
             cx.finding("php2shell-ineffective-mitigation", Confidence::High, row,
@@ -566,8 +753,15 @@ fn run_with_timeout(bin: &str, args: &[&str], timeout: Duration) -> Option<Strin
 }
 
 fn candidate_binaries() -> Vec<String> {
-    let mut names: Vec<String> = vec!["php".into(), "php-fpm".into(), "php-cgi".into(), "frankenphp".into()];
-    for minor in ["5.6", "7.0", "7.1", "7.2", "7.3", "7.4", "8.0", "8.1", "8.2", "8.3", "8.4", "8.5"] {
+    let mut names: Vec<String> = vec![
+        "php".into(),
+        "php-fpm".into(),
+        "php-cgi".into(),
+        "frankenphp".into(),
+    ];
+    for minor in [
+        "5.6", "7.0", "7.1", "7.2", "7.3", "7.4", "8.0", "8.1", "8.2", "8.3", "8.4", "8.5",
+    ] {
         names.push(format!("php{minor}"));
         names.push(format!("php-fpm{minor}"));
         names.push(format!("php{}", minor.replace('.', "")));
@@ -575,7 +769,15 @@ fn candidate_binaries() -> Vec<String> {
     let mut found = Vec::new();
     let path = std::env::var_os("PATH").unwrap_or_default();
     let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
-    for extra in ["/usr/sbin", "/usr/local/sbin", "/opt/homebrew/bin", "/usr/local/bin", "C:\\php", "C:\\xampp\\php", "C:\\wamp64\\bin\\php"] {
+    for extra in [
+        "/usr/sbin",
+        "/usr/local/sbin",
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "C:\\php",
+        "C:\\xampp\\php",
+        "C:\\wamp64\\bin\\php",
+    ] {
         dirs.push(extra.into());
     }
     for d in dirs {
@@ -601,30 +803,57 @@ pub fn probe_local_runtimes(adv: &Advisory) -> Vec<LocalRuntime> {
     for bin in candidate_binaries() {
         let is_fpm = bin.contains("fpm");
         let (version, sapi, ini) = if is_fpm || bin.contains("frankenphp") {
-            let v = run_with_timeout(&bin, &["-v"], Duration::from_secs(5)).and_then(|s| PhpVersion::parse(&s));
-            (v, Some(if is_fpm { "fpm-fcgi".to_string() } else { "frankenphp".to_string() }), HashMap::new())
+            let v = run_with_timeout(&bin, &["-v"], Duration::from_secs(5))
+                .and_then(|s| PhpVersion::parse(&s));
+            (
+                v,
+                Some(if is_fpm {
+                    "fpm-fcgi".to_string()
+                } else {
+                    "frankenphp".to_string()
+                }),
+                HashMap::new(),
+            )
         } else {
             let raw = run_with_timeout(&bin, &["-r", PROBE], Duration::from_secs(5));
             match raw {
                 Some(s) if s.contains('|') => {
                     let parts: Vec<&str> = s.trim().split('|').collect();
                     let mut ini = HashMap::new();
-                    for (k, i) in [("session.upload_progress.enabled", 2), ("fatal_error_backtraces", 3), ("memory_limit", 4), ("post_max_size", 5)] {
+                    for (k, i) in [
+                        ("session.upload_progress.enabled", 2),
+                        ("fatal_error_backtraces", 3),
+                        ("memory_limit", 4),
+                        ("post_max_size", 5),
+                    ] {
                         if let Some(v) = parts.get(i) {
                             ini.insert(k.to_string(), v.to_string());
                         }
                     }
-                    (PhpVersion::parse(parts[0]), parts.get(1).map(|s| s.to_string()), ini)
+                    (
+                        PhpVersion::parse(parts[0]),
+                        parts.get(1).map(|s| s.to_string()),
+                        ini,
+                    )
                 }
                 Some(s) => (PhpVersion::parse(&s), None, HashMap::new()),
                 None => (None, None, HashMap::new()),
             }
         };
-        let status = version.map(|v| adv.evaluate(&v)).unwrap_or(RuntimeStatus::Unverified);
+        let status = version
+            .map(|v| adv.evaluate(&v))
+            .unwrap_or(RuntimeStatus::Unverified);
         let mut issues = Vec::new();
         match status {
-            RuntimeStatus::Vulnerable => issues.push(format!("Affected by {}; upgrade to {} and restart.", adv.cves.join(" / "), adv.fixed_list())),
-            RuntimeStatus::Unsupported => issues.push("End-of-life branch with no official fix; upgrade or use an LTS vendor build.".into()),
+            RuntimeStatus::Vulnerable => issues.push(format!(
+                "Affected by {}; upgrade to {} and restart.",
+                adv.cves.join(" / "),
+                adv.fixed_list()
+            )),
+            RuntimeStatus::Unsupported => issues.push(
+                "End-of-life branch with no official fix; upgrade or use an LTS vendor build."
+                    .into(),
+            ),
             RuntimeStatus::Unverified => issues.push("Version could not be determined.".into()),
             RuntimeStatus::Patched => {}
         }
@@ -635,12 +864,22 @@ pub fn probe_local_runtimes(adv: &Advisory) -> Vec<LocalRuntime> {
                 }
                 if let Some(v) = ini.get(&m.directive) {
                     if !m.safe_values.contains(&v.to_ascii_lowercase()) {
-                        issues.push(format!("{} = {v} (temporary mitigation: set to 0 in php.ini / FPM pool).", m.directive));
+                        issues.push(format!(
+                            "{} = {v} (temporary mitigation: set to 0 in php.ini / FPM pool).",
+                            m.directive
+                        ));
                     }
                 }
             }
         }
-        out.push(LocalRuntime { binary: bin, version: version.map(|v| v.to_string()), sapi, ini, status, issues });
+        out.push(LocalRuntime {
+            binary: bin,
+            version: version.map(|v| v.to_string()),
+            sapi,
+            ini,
+            status,
+            issues,
+        });
     }
     out
 }
@@ -687,7 +926,12 @@ mod tests {
         let r = run(ConfigKind::Dockerfile, "Dockerfile", src);
         assert_eq!(
             rules(&r),
-            vec!["php2shell-vulnerable-runtime", "php2shell-unpinned-runtime", "php2shell-unsupported-runtime", "php2shell-unpinned-runtime"]
+            vec![
+                "php2shell-vulnerable-runtime",
+                "php2shell-unpinned-runtime",
+                "php2shell-unsupported-runtime",
+                "php2shell-unpinned-runtime"
+            ]
         );
         assert_eq!(r.findings[0].start.0, 1);
         assert_eq!(r.runtimes.len(), 5);
@@ -698,7 +942,13 @@ mod tests {
     fn compose_and_bundling_images() {
         let src = "services:\n  app:\n    image: wordpress:latest\n  db:\n    image: mysql:8\n  php:\n    image: \"php:7.4-fpm\"\n";
         let r = run(ConfigKind::Yaml, "docker-compose.yml", src);
-        assert_eq!(rules(&r), vec!["php2shell-unpinned-runtime", "php2shell-unsupported-runtime"]);
+        assert_eq!(
+            rules(&r),
+            vec![
+                "php2shell-unpinned-runtime",
+                "php2shell-unsupported-runtime"
+            ]
+        );
     }
 
     #[test]
@@ -708,62 +958,129 @@ mod tests {
   "config": { "platform": { "php": "8.2.20" } }
 }"#;
         let r = run(ConfigKind::ComposerJson, "composer.json", src);
-        assert_eq!(rules(&r), vec!["php2shell-vulnerable-runtime", "php2shell-composer-constraint"]);
+        assert_eq!(
+            rules(&r),
+            vec![
+                "php2shell-vulnerable-runtime",
+                "php2shell-composer-constraint"
+            ]
+        );
         assert_eq!(r.findings[0].start.0, 2);
         assert_eq!(r.findings[1].start.0, 1);
 
-        let ok = run(ConfigKind::ComposerJson, "composer.json", r#"{"require":{"php":"~8.3.36 || ^8.5.12"}}"#);
+        let ok = run(
+            ConfigKind::ComposerJson,
+            "composer.json",
+            r#"{"require":{"php":"~8.3.36 || ^8.5.12"}}"#,
+        );
         assert!(ok.findings.is_empty());
     }
 
     #[test]
     fn ini_mitigations() {
-        let r = run(ConfigKind::PhpIni, "docker/php.ini", "memory_limit = 256M\nsession.upload_progress.enabled = On\n");
-        assert_eq!(rules(&r), vec!["php2shell-mitigation-missing", "php2shell-mitigation-missing"]);
+        let r = run(
+            ConfigKind::PhpIni,
+            "docker/php.ini",
+            "memory_limit = 256M\nsession.upload_progress.enabled = On\n",
+        );
+        assert_eq!(
+            rules(&r),
+            vec![
+                "php2shell-mitigation-missing",
+                "php2shell-mitigation-missing"
+            ]
+        );
         assert_eq!(r.findings[0].start.0, 1);
         assert!(r.findings[1].message.starts_with("fatal_error_backtraces"));
 
         let missing = run(ConfigKind::PhpIni, "php.ini", "memory_limit = -1\n");
         assert_eq!(rules(&missing), vec!["php2shell-mitigation-missing"]);
 
-        let ok = run(ConfigKind::PhpIni, "php.ini", "session.upload_progress.enabled = 0\nfatal_error_backtraces = Off\n");
+        let ok = run(
+            ConfigKind::PhpIni,
+            "php.ini",
+            "session.upload_progress.enabled = 0\nfatal_error_backtraces = Off\n",
+        );
         assert!(ok.findings.is_empty());
 
-        let pool = run(ConfigKind::FpmPool, "php-fpm.d/www.conf", "php_admin_value[session.upload_progress.enabled] = 1\n");
+        let pool = run(
+            ConfigKind::FpmPool,
+            "php-fpm.d/www.conf",
+            "php_admin_value[session.upload_progress.enabled] = 1\n",
+        );
         assert_eq!(rules(&pool), vec!["php2shell-mitigation-missing"]);
 
-        let pool_ok = run(ConfigKind::FpmPool, "php-fpm.d/www.conf", "php_admin_flag[session.upload_progress.enabled] = off\n");
+        let pool_ok = run(
+            ConfigKind::FpmPool,
+            "php-fpm.d/www.conf",
+            "php_admin_flag[session.upload_progress.enabled] = off\n",
+        );
         assert!(pool_ok.findings.is_empty());
     }
 
     #[test]
     fn per_dir_mitigation_is_ineffective() {
-        let r = run(ConfigKind::PerDirIni, "public/.user.ini", "session.upload_progress.enabled=0\n");
+        let r = run(
+            ConfigKind::PerDirIni,
+            "public/.user.ini",
+            "session.upload_progress.enabled=0\n",
+        );
         assert_eq!(rules(&r), vec!["php2shell-ineffective-mitigation"]);
-        let h = run(ConfigKind::Htaccess, "public/.htaccess", "php_flag session.upload_progress.enabled off\n");
+        let h = run(
+            ConfigKind::Htaccess,
+            "public/.htaccess",
+            "php_flag session.upload_progress.enabled off\n",
+        );
         assert_eq!(rules(&h), vec!["php2shell-ineffective-mitigation"]);
     }
 
     #[test]
     fn rlimit_detection() {
-        let r = run(ConfigKind::SystemdUnit, "deploy/php-fpm.service", "[Service]\nLimitAS=4G\nLimitNOFILE=65535\nLimitDATA=infinity\n");
+        let r = run(
+            ConfigKind::SystemdUnit,
+            "deploy/php-fpm.service",
+            "[Service]\nLimitAS=4G\nLimitNOFILE=65535\nLimitDATA=infinity\n",
+        );
         assert_eq!(rules(&r), vec!["php2shell-rlimit-misuse"]);
-        let s = run(ConfigKind::Shell, "docker-entrypoint.sh", "#!/bin/sh\nulimit -v 2000000\nexec php-fpm\n");
+        let s = run(
+            ConfigKind::Shell,
+            "docker-entrypoint.sh",
+            "#!/bin/sh\nulimit -v 2000000\nexec php-fpm\n",
+        );
         assert_eq!(rules(&s), vec!["php2shell-rlimit-misuse"]);
     }
 
     #[test]
     fn version_files() {
-        assert_eq!(rules(&run(ConfigKind::VersionFile, ".php-version", "8.3.12\n")), vec!["php2shell-vulnerable-runtime"]);
-        assert_eq!(rules(&run(ConfigKind::ToolVersions, ".tool-versions", "nodejs 22.1.0\nphp 8.4.27\n")), Vec::<&str>::new());
+        assert_eq!(
+            rules(&run(ConfigKind::VersionFile, ".php-version", "8.3.12\n")),
+            vec!["php2shell-vulnerable-runtime"]
+        );
+        assert_eq!(
+            rules(&run(
+                ConfigKind::ToolVersions,
+                ".tool-versions",
+                "nodejs 22.1.0\nphp 8.4.27\n"
+            )),
+            Vec::<&str>::new()
+        );
     }
 
     #[test]
     fn classification() {
         assert_eq!(classify("composer.json"), Some(ConfigKind::ComposerJson));
-        assert_eq!(classify("docker/app/Dockerfile"), Some(ConfigKind::Dockerfile));
-        assert_eq!(classify("docker/php/conf.d/custom.ini"), Some(ConfigKind::PhpIni));
-        assert_eq!(classify("etc/php-fpm.d/www.conf"), Some(ConfigKind::FpmPool));
+        assert_eq!(
+            classify("docker/app/Dockerfile"),
+            Some(ConfigKind::Dockerfile)
+        );
+        assert_eq!(
+            classify("docker/php/conf.d/custom.ini"),
+            Some(ConfigKind::PhpIni)
+        );
+        assert_eq!(
+            classify("etc/php-fpm.d/www.conf"),
+            Some(ConfigKind::FpmPool)
+        );
         assert_eq!(classify("public/.user.ini"), Some(ConfigKind::PerDirIni));
         assert_eq!(classify("src/index.php"), None);
     }

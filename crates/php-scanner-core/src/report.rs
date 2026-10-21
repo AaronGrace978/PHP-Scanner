@@ -36,7 +36,9 @@ impl FromStr for Format {
             "sarif" => Ok(Format::Sarif),
             "html" => Ok(Format::Html),
             "csv" => Ok(Format::Csv),
-            o => Err(format!("unknown report format '{o}' (expected json, sarif, html, csv)")),
+            o => Err(format!(
+                "unknown report format '{o}' (expected json, sarif, html, csv)"
+            )),
         }
     }
 }
@@ -60,7 +62,10 @@ fn sarif_level(s: Severity) -> &'static str {
 
 pub fn sarif(report: &ScanReport) -> String {
     let used: BTreeSet<&str> = report.findings.iter().map(|f| f.rule_id.as_str()).collect();
-    let rule_list: Vec<&rules::Rule> = rules::all().iter().filter(|r| used.contains(r.id)).collect();
+    let rule_list: Vec<&rules::Rule> = rules::all()
+        .iter()
+        .filter(|r| used.contains(r.id))
+        .collect();
     let rule_index = |id: &str| rule_list.iter().position(|r| r.id == id).unwrap_or(0);
     let sarif_rules: Vec<_> = rule_list
         .iter()
@@ -148,7 +153,11 @@ pub fn sarif(report: &ScanReport) -> String {
 }
 
 fn csv_field(s: &str) -> String {
-    let s = if s.starts_with(['=', '+', '-', '@']) { format!("'{s}") } else { s.to_string() };
+    let s = if s.starts_with(['=', '+', '-', '@']) {
+        format!("'{s}")
+    } else {
+        s.to_string()
+    };
     if s.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
@@ -157,7 +166,9 @@ fn csv_field(s: &str) -> String {
 }
 
 pub fn csv(report: &ScanReport) -> String {
-    let mut out = String::from("severity,confidence,rule_id,title,cwe,file,line,column,message,snippet,fingerprint\n");
+    let mut out = String::from(
+        "severity,confidence,rule_id,title,cwe,file,line,column,message,snippet,fingerprint\n",
+    );
     for f in &report.findings {
         let row = [
             f.severity.as_str().to_string(),
@@ -172,7 +183,12 @@ pub fn csv(report: &ScanReport) -> String {
             f.snippet.clone(),
             f.fingerprint.clone(),
         ];
-        out.push_str(&row.iter().map(|c| csv_field(c)).collect::<Vec<_>>().join(","));
+        out.push_str(
+            &row.iter()
+                .map(|c| csv_field(c))
+                .collect::<Vec<_>>()
+                .join(","),
+        );
         out.push('\n');
     }
     out
@@ -202,18 +218,39 @@ fn finding_html(f: &Finding) -> String {
         .context
         .iter()
         .map(|c| {
-            let cls = if c.line == f.line { " class=\"hit\"" } else { "" };
-            format!("<div{cls}><span class=\"ln\">{}</span>{}</div>", c.line, esc(&c.text))
+            let cls = if c.line == f.line {
+                " class=\"hit\""
+            } else {
+                ""
+            };
+            format!(
+                "<div{cls}><span class=\"ln\">{}</span>{}</div>",
+                c.line,
+                esc(&c.text)
+            )
         })
         .collect();
     let flow = if f.flow.is_empty() {
         String::new()
     } else {
-        let steps: String = f.flow.iter().map(|s| format!("<li>Line {}: {}</li>", s.line, esc(&s.description))).collect();
+        let steps: String = f
+            .flow
+            .iter()
+            .map(|s| format!("<li>Line {}: {}</li>", s.line, esc(&s.description)))
+            .collect();
         format!("<h4>Data flow</h4><ol class=\"flow\">{steps}</ol>")
     };
-    let cwe = f.cwe.map(|c| format!(" · <a href=\"https://cwe.mitre.org/data/definitions/{c}.html\">CWE-{c}</a>")).unwrap_or_default();
-    let owasp = f.owasp.as_deref().map(|o| format!(" · {}", esc(o))).unwrap_or_default();
+    let cwe = f
+        .cwe
+        .map(|c| {
+            format!(" · <a href=\"https://cwe.mitre.org/data/definitions/{c}.html\">CWE-{c}</a>")
+        })
+        .unwrap_or_default();
+    let owasp = f
+        .owasp
+        .as_deref()
+        .map(|o| format!(" · {}", esc(o)))
+        .unwrap_or_default();
     format!(
         r#"<details class="finding" data-sev="{sev}"><summary><span class="sev" style="background:{color}">{sev}</span><strong>{title}</strong><span class="loc">{file}:{line}</span></summary>
 <div class="body"><p>{msg}</p><p class="meta">Rule <code>{rule}</code> · confidence {conf}{cwe}{owasp}</p><pre class="code">{ctx}</pre>{flow}<p class="fix"><strong>Fix:</strong> {fix}</p></div></details>"#,
@@ -285,7 +322,11 @@ pub fn html(report: &ScanReport) -> String {
         .collect();
 
     let findings: String = report.findings.iter().map(finding_html).collect();
-    let empty = if report.findings.is_empty() { "<p>No findings.</p>" } else { "" };
+    let empty = if report.findings.is_empty() {
+        "<p>No findings.</p>"
+    } else {
+        ""
+    };
     format!(
         r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{tool} report – {root}</title>

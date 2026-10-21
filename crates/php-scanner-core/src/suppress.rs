@@ -34,7 +34,11 @@ pub struct Suppressions {
 
 fn is_comment_only(line: &str) -> bool {
     let t = line.trim_start();
-    t.starts_with("//") || t.starts_with('#') || t.starts_with("/*") || t.starts_with('*') || t.starts_with("<?php //")
+    t.starts_with("//")
+        || t.starts_with('#')
+        || t.starts_with("/*")
+        || t.starts_with('*')
+        || t.starts_with("<?php //")
 }
 
 fn parse_scope(rest: &str) -> Scope {
@@ -46,7 +50,11 @@ fn parse_scope(rest: &str) -> Scope {
         .split(|c: char| c == ',' || c.is_whitespace())
         .map(|s| s.trim().trim_end_matches("*/").trim())
         .take_while(|s| !s.starts_with("--"))
-        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+        .filter(|s| {
+            !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        })
         .map(|s| s.to_string())
         .collect();
     if rules.is_empty() {
@@ -66,7 +74,11 @@ impl Suppressions {
             if let Some(pos) = line.find(FILE_MARKER) {
                 s.file.push(parse_scope(&line[pos + FILE_MARKER.len()..]));
             } else if let Some(pos) = line.find(LINE_MARKER) {
-                s.lines.push((i, is_comment_only(line), parse_scope(&line[pos + LINE_MARKER.len()..])));
+                s.lines.push((
+                    i,
+                    is_comment_only(line),
+                    parse_scope(&line[pos + LINE_MARKER.len()..]),
+                ));
             }
         }
         s
@@ -90,12 +102,16 @@ mod tests {
 
     #[test]
     fn same_and_previous_line() {
-        let s = Suppressions::parse("a\n// php-scanner-ignore\nb\nc // php-scanner-ignore: xss\nd\n");
+        let s =
+            Suppressions::parse("a\n// php-scanner-ignore\nb\nc // php-scanner-ignore: xss\nd\n");
         assert!(s.is_suppressed("sql-injection", 1));
         assert!(s.is_suppressed("sql-injection", 2));
         assert!(!s.is_suppressed("sql-injection", 3));
         assert!(s.is_suppressed("xss", 3));
-        assert!(!s.is_suppressed("xss", 4), "trailing marker must not leak to the next line");
+        assert!(
+            !s.is_suppressed("xss", 4),
+            "trailing marker must not leak to the next line"
+        );
         assert!(!s.is_suppressed("xss", 0));
     }
 

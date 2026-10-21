@@ -35,7 +35,9 @@ pub struct Baseline {
 
 impl Baseline {
     pub fn from_report(r: &ScanReport) -> Self {
-        Baseline { fingerprints: r.findings.iter().map(|f| f.fingerprint.clone()).collect() }
+        Baseline {
+            fingerprints: r.findings.iter().map(|f| f.fingerprint.clone()).collect(),
+        }
     }
 }
 
@@ -123,7 +125,14 @@ struct FileResult {
     error: Option<String>,
 }
 
-const UPLOAD_DIRS: &[&str] = &["uploads", "upload", "user_uploads", "useruploads", "attachments", "user-uploads"];
+const UPLOAD_DIRS: &[&str] = &[
+    "uploads",
+    "user_uploads",
+    "useruploads",
+    "user-uploads",
+    "uploaded_files",
+    "fileuploads",
+];
 
 impl Scanner {
     pub fn new(config: ScanConfig) -> Self {
@@ -144,10 +153,16 @@ impl Scanner {
         self.scan_with_progress(root, &|_| {})
     }
 
-    pub fn scan_with_progress(&self, root: &Path, progress: &(dyn Fn(ScanProgress) + Sync)) -> Result<ScanReport, String> {
+    pub fn scan_with_progress(
+        &self,
+        root: &Path,
+        progress: &(dyn Fn(ScanProgress) + Sync),
+    ) -> Result<ScanReport, String> {
         let started = Instant::now();
         let started_at = chrono::Utc::now().to_rfc3339();
-        let root = root.canonicalize().map_err(|e| format!("{}: {e}", root.display()))?;
+        let root = root
+            .canonicalize()
+            .map_err(|e| format!("{}: {e}", root.display()))?;
         let files = discovery::walk(&root, &self.config)?;
         let total = files.len();
         let done = AtomicUsize::new(0);
@@ -159,7 +174,12 @@ impl Scanner {
             .build()
             .map_err(|e| e.to_string())?;
 
-        progress(ScanProgress { files_total: total, files_done: 0, findings: 0, current_file: String::new() });
+        progress(ScanProgress {
+            files_total: total,
+            files_done: 0,
+            findings: 0,
+            current_file: String::new(),
+        });
 
         let results: Vec<FileResult> = pool.install(|| {
             files
@@ -175,7 +195,12 @@ impl Scanner {
                     if last.elapsed().as_millis() >= 50 || d == total {
                         *last = Instant::now();
                         drop(last);
-                        progress(ScanProgress { files_total: total, files_done: d, findings: n, current_file: f.rel.clone() });
+                        progress(ScanProgress {
+                            files_total: total,
+                            files_done: d,
+                            findings: n,
+                            current_file: f.rel.clone(),
+                        });
                     }
                     Some(r)
                 })
@@ -218,13 +243,24 @@ impl Scanner {
                 .then_with(|| a.rule_id.cmp(&b.rule_id))
         });
         for f in &findings {
-            *summary.by_severity.entry(f.severity.to_string()).or_default() += 1;
+            *summary
+                .by_severity
+                .entry(f.severity.to_string())
+                .or_default() += 1;
             *summary.by_rule.entry(f.rule_id.clone()).or_default() += 1;
-            *summary.by_category.entry(f.category.label().to_string()).or_default() += 1;
+            *summary
+                .by_category
+                .entry(f.category.label().to_string())
+                .or_default() += 1;
         }
         summary.total = findings.len();
 
-        let advisories = self.advisories.advisories.iter().map(|a| self.advisory_report(a, &runtimes, &findings)).collect();
+        let advisories = self
+            .advisories
+            .advisories
+            .iter()
+            .map(|a| self.advisory_report(a, &runtimes, &findings))
+            .collect();
 
         Ok(ScanReport {
             tool: TOOL_NAME.into(),
@@ -246,19 +282,47 @@ impl Scanner {
         })
     }
 
-    fn advisory_report(&self, adv: &Advisory, runtimes: &[RuntimeDetection], findings: &[Finding]) -> AdvisoryReport {
-        let runtimes: Vec<RuntimeDetection> = runtimes.iter().filter(|r| r.advisory_id == adv.id).cloned().collect();
-        let local_runtimes = if self.probe_local_runtimes { advisory::probe_local_runtimes(adv) } else { Vec::new() };
-        let related = findings.iter().filter(|f| f.rule_id.starts_with("php2shell-")).count();
-        let compromise = findings.iter().filter(|f| f.category == Category::Malware).count();
-        let secrets = findings.iter().filter(|f| f.category == Category::Secrets).count();
-        let bad = |s: RuntimeStatus| matches!(s, RuntimeStatus::Vulnerable | RuntimeStatus::Unsupported);
+    fn advisory_report(
+        &self,
+        adv: &Advisory,
+        runtimes: &[RuntimeDetection],
+        findings: &[Finding],
+    ) -> AdvisoryReport {
+        let runtimes: Vec<RuntimeDetection> = runtimes
+            .iter()
+            .filter(|r| r.advisory_id == adv.id)
+            .cloned()
+            .collect();
+        let local_runtimes = if self.probe_local_runtimes {
+            advisory::probe_local_runtimes(adv)
+        } else {
+            Vec::new()
+        };
+        let related = findings
+            .iter()
+            .filter(|f| f.rule_id.starts_with("php2shell-"))
+            .count();
+        let compromise = findings
+            .iter()
+            .filter(|f| f.category == Category::Malware)
+            .count();
+        let secrets = findings
+            .iter()
+            .filter(|f| f.category == Category::Secrets)
+            .count();
+        let bad =
+            |s: RuntimeStatus| matches!(s, RuntimeStatus::Vulnerable | RuntimeStatus::Unsupported);
         let action = runtimes.iter().any(|r| bad(r.status))
             || local_runtimes.iter().any(|r| bad(r.status))
-            || findings.iter().any(|f| f.rule_id.starts_with("php2shell-") && f.severity >= Severity::High)
+            || findings
+                .iter()
+                .any(|f| f.rule_id.starts_with("php2shell-") && f.severity >= Severity::High)
             || compromise > 0;
-        let all_patched = !runtimes.is_empty() && runtimes.iter().all(|r| r.status == RuntimeStatus::Patched)
-            && local_runtimes.iter().all(|r| r.status == RuntimeStatus::Patched);
+        let all_patched = !runtimes.is_empty()
+            && runtimes.iter().all(|r| r.status == RuntimeStatus::Patched)
+            && local_runtimes
+                .iter()
+                .all(|r| r.status == RuntimeStatus::Patched);
         let verdict = if action {
             AdvisoryVerdict::ActionRequired
         } else if all_patched {
@@ -278,7 +342,15 @@ impl Scanner {
     }
 
     fn scan_file(&self, f: &DiscoveredFile) -> FileResult {
-        let mut res = FileResult { findings: vec![], runtimes: vec![], lines: 0, parse_error: false, suppressed: 0, skipped: false, error: None };
+        let mut res = FileResult {
+            findings: vec![],
+            runtimes: vec![],
+            lines: 0,
+            parse_error: false,
+            suppressed: 0,
+            skipped: false,
+            error: None,
+        };
         if f.size > self.config.max_file_size {
             res.skipped = true;
             return res;
@@ -323,12 +395,20 @@ impl Scanner {
                     res.runtimes.extend(r.runtimes);
                 }
                 let p = patterns::scan_text(src, &starts, &f.rel);
-                raw.extend(p.findings.into_iter().filter(|x| x.rule_id == "leaked-secret"));
+                raw.extend(
+                    p.findings
+                        .into_iter()
+                        .filter(|x| x.rule_id == "leaked-secret"),
+                );
                 secret_spans.extend(p.secret_spans);
             }
             FileKind::Env => {
                 let p = patterns::scan_text(src, &starts, &f.rel);
-                raw.extend(p.findings.into_iter().filter(|x| x.rule_id == "leaked-secret"));
+                raw.extend(
+                    p.findings
+                        .into_iter()
+                        .filter(|x| x.rule_id == "leaked-secret"),
+                );
                 secret_spans.extend(p.secret_spans);
             }
             FileKind::Other => {}
@@ -339,8 +419,13 @@ impl Scanner {
         let mut occurrences: HashMap<(String, String), usize> = HashMap::new();
         let mut seen = HashSet::new();
         for r in raw {
-            let Some(rule) = rules::get(r.rule_id) else { continue };
-            if !self.config.rule_enabled(rule.id) || rule.severity < self.config.min_severity || r.confidence < self.config.min_confidence {
+            let Some(rule) = rules::get(r.rule_id) else {
+                continue;
+            };
+            if !self.config.rule_enabled(rule.id)
+                || rule.severity < self.config.min_severity
+                || r.confidence < self.config.min_confidence
+            {
                 continue;
             }
             if !seen.insert((r.rule_id, r.start.0, r.start.1)) {
@@ -352,7 +437,14 @@ impl Scanner {
             }
             let row = r.start.0.min(lines.len().saturating_sub(1));
             let line_text = lines.get(row).copied().unwrap_or("");
-            let snippet = clip(&redact_line(line_text, starts.get(row).copied().unwrap_or(0), &secret_spans), 300);
+            let snippet = clip(
+                &redact_line(
+                    line_text,
+                    starts.get(row).copied().unwrap_or(0),
+                    &secret_spans,
+                ),
+                300,
+            );
             let ctx_from = row.saturating_sub(self.config.context_lines);
             let ctx_to = (row + self.config.context_lines).min(lines.len().saturating_sub(1));
             let context = (ctx_from..=ctx_to)
@@ -364,7 +456,9 @@ impl Scanner {
                 })
                 .collect();
             let norm: String = line_text.split_whitespace().collect::<Vec<_>>().join(" ");
-            let occ = occurrences.entry((rule.id.to_string(), norm.clone())).or_insert(0);
+            let occ = occurrences
+                .entry((rule.id.to_string(), norm.clone()))
+                .or_insert(0);
             *occ += 1;
             let fingerprint = fingerprint(rule.id, &f.rel, &norm, *occ);
             res.findings.push(Finding {
@@ -394,22 +488,41 @@ impl Scanner {
     fn upload_dir_check(&self, f: &DiscoveredFile, src: &str, raw: &mut Vec<RawFinding>) {
         let lower = f.rel.to_ascii_lowercase();
         let segments: Vec<&str> = lower.split('/').collect();
-        let in_upload = segments[..segments.len().saturating_sub(1)].iter().any(|s| UPLOAD_DIRS.contains(s));
+        let in_upload = segments[..segments.len().saturating_sub(1)]
+            .iter()
+            .any(|s| UPLOAD_DIRS.contains(s));
         if !in_upload {
             return;
         }
         let stripped: String = src
             .lines()
             .map(|l| l.trim())
-            .filter(|l| !l.is_empty() && !l.starts_with("//") && !l.starts_with('#') && !l.starts_with("/*") && !l.starts_with('*'))
+            .filter(|l| {
+                !l.is_empty()
+                    && !l.starts_with("//")
+                    && !l.starts_with('#')
+                    && !l.starts_with("/*")
+                    && !l.starts_with('*')
+            })
             .collect();
-        let trivial = matches!(stripped.as_str(), "<?php" | "<?php?>" | "<?php // Silence is golden." | "<?phpexit;" | "<?phpdie();" | "<?phpexit();");
+        let trivial = matches!(
+            stripped.as_str(),
+            "<?php"
+                | "<?php?>"
+                | "<?php // Silence is golden."
+                | "<?phpexit;"
+                | "<?phpdie();"
+                | "<?phpexit();"
+        );
         if trivial {
             return;
         }
         raw.push(RawFinding {
             rule_id: "php-in-upload-dir",
-            message: format!("Executable PHP file '{}' found inside an upload directory.", f.rel),
+            message: format!(
+                "Executable PHP file '{}' found inside an upload directory.",
+                f.rel
+            ),
             confidence: crate::finding::Confidence::Medium,
             start: (0, 0),
             end: (0, 0),
@@ -448,7 +561,12 @@ fn redact_line(line: &str, line_start: usize, spans: &[(usize, usize)]) -> Strin
     let mut relevant: Vec<(usize, usize)> = spans
         .iter()
         .filter(|(s, e)| *s < line_end && *e > line_start)
-        .map(|(s, e)| (s.saturating_sub(line_start), (*e).min(line_end) - line_start))
+        .map(|(s, e)| {
+            (
+                s.saturating_sub(line_start),
+                (*e).min(line_end) - line_start,
+            )
+        })
         .collect();
     relevant.sort_by_key(|r| std::cmp::Reverse(r.0));
     for (s, e) in relevant {

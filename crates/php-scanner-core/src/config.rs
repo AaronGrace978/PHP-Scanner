@@ -30,10 +30,12 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
-            extensions: ["php", "phtml", "php3", "php4", "php5", "php7", "php8", "phps", "inc", "module"]
-                .iter()
-                .map(|s| s.to_string())
-                .collect(),
+            extensions: [
+                "php", "phtml", "php3", "php4", "php5", "php7", "php8", "phps", "inc", "module",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
             exclude: Vec::new(),
             respect_gitignore: true,
             include_hidden: false,

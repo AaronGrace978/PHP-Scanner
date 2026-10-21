@@ -124,6 +124,7 @@ impl Category {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContextLine {
     pub line: usize,
     pub text: String,
@@ -131,12 +132,14 @@ pub struct ContextLine {
 
 /// A step in a taint flow, from user-controlled source to dangerous sink.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FlowStep {
     pub line: usize,
     pub description: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Finding {
     /// Stable fingerprint used for baselines and de-duplication.
     pub fingerprint: String,

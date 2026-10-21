@@ -38,7 +38,9 @@ fn build_globs(patterns: &[String]) -> Result<GlobSet, String> {
             b.add(Glob::new(&format!("**/{p}")).map_err(|e| e.to_string())?);
         }
         if !p.ends_with("/**") {
-            b.add(Glob::new(&format!("{}/**", p.trim_end_matches('/'))).map_err(|e| e.to_string())?);
+            b.add(
+                Glob::new(&format!("{}/**", p.trim_end_matches('/'))).map_err(|e| e.to_string())?,
+            );
         }
     }
     b.build().map_err(|e| e.to_string())
@@ -84,7 +86,10 @@ fn walker(root: &Path, cfg: &ScanConfig) -> WalkBuilder {
             if !scan_deps && DEPENDENCY_DIRS.contains(&name.as_ref()) {
                 return false;
             }
-            if name.starts_with('.') && !include_hidden && !ALLOWED_HIDDEN_DIRS.contains(&name.as_ref()) {
+            if name.starts_with('.')
+                && !include_hidden
+                && !ALLOWED_HIDDEN_DIRS.contains(&name.as_ref())
+            {
                 return false;
             }
             true
@@ -99,7 +104,9 @@ fn rel_path(root: &Path, p: &Path) -> String {
     let rel = p.strip_prefix(root).unwrap_or(p);
     let s = rel.to_string_lossy().replace('\\', "/");
     if s.is_empty() {
-        p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+        p.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default()
     } else {
         s
     }
@@ -111,11 +118,23 @@ fn collect(root: &Path, cfg: &ScanConfig, keep_other: bool) -> Result<Vec<Discov
     }
     let excludes = build_globs(&cfg.exclude)?;
     if root.is_file() {
-        let rel = root.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let rel = root
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         let kind = classify_file(&rel, cfg);
         let size = std::fs::metadata(root).map(|m| m.len()).unwrap_or(0);
-        let kind = if kind == FileKind::Other && !keep_other { FileKind::Php } else { kind };
-        return Ok(vec![DiscoveredFile { path: root.to_path_buf(), rel, kind, size }]);
+        let kind = if kind == FileKind::Other && !keep_other {
+            FileKind::Php
+        } else {
+            kind
+        };
+        return Ok(vec![DiscoveredFile {
+            path: root.to_path_buf(),
+            rel,
+            kind,
+            size,
+        }]);
     }
     let mut out = Vec::new();
     for entry in walker(root, cfg).build() {
@@ -132,7 +151,12 @@ fn collect(root: &Path, cfg: &ScanConfig, keep_other: bool) -> Result<Vec<Discov
             continue;
         }
         let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-        out.push(DiscoveredFile { path: entry.into_path(), rel, kind, size });
+        out.push(DiscoveredFile {
+            path: entry.into_path(),
+            rel,
+            kind,
+            size,
+        });
     }
     out.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(out)
@@ -167,7 +191,10 @@ mod tests {
         std::fs::write(p.join("Dockerfile"), "FROM php:8.3").unwrap();
         std::fs::write(p.join(".env"), "X=1").unwrap();
         std::fs::write(p.join("readme.md"), "x").unwrap();
-        let cfg = ScanConfig { exclude: vec!["tests".into()], ..Default::default() };
+        let cfg = ScanConfig {
+            exclude: vec!["tests".into()],
+            ..Default::default()
+        };
         let files: Vec<String> = walk(p, &cfg).unwrap().into_iter().map(|f| f.rel).collect();
         assert_eq!(files, vec![".env", "Dockerfile", "src/a.php"]);
     }
