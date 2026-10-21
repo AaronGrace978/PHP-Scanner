@@ -1,0 +1,57 @@
+{
+  "version": "2026-10-21.1",
+  "advisories": [
+    {
+      "id": "PHP2SHELL-2026-10",
+      "title": "php2shell: unauthenticated remote code execution in the PHP runtime",
+      "cves": ["CVE-2026-109618", "CVE-2026-109619"],
+      "published": "2026-10-21",
+      "severity": "critical",
+      "summary": "Two memory-safety flaws in the PHP interpreter itself (out-of-memory request corruption and stale request state use-after-free) allow unauthenticated remote code execution and worker memory disclosure on every PHP installation serving web requests (mod_php, PHP-FPM, php-cgi, FrankenPHP, LiteSpeed). Application code changes cannot fix them: the PHP runtime must be upgraded and every PHP process restarted.",
+      "fixed": [
+        { "branch": "8.5", "version": "8.5.12" },
+        { "branch": "8.4", "version": "8.4.27" },
+        { "branch": "8.3", "version": "8.3.36" },
+        { "branch": "8.2", "version": "8.2.35" }
+      ],
+      "minimumSupportedBranch": "8.2",
+      "iniMitigations": [
+        {
+          "directive": "session.upload_progress.enabled",
+          "safeValues": ["0", "off", "false", "no", ""],
+          "default": "1",
+          "cve": "CVE-2026-109619",
+          "branches": []
+        },
+        {
+          "directive": "fatal_error_backtraces",
+          "safeValues": ["0", "off", "false", "no", ""],
+          "default": "1",
+          "cve": "CVE-2026-109619",
+          "branches": ["8.5"]
+        }
+      ],
+      "actions": [
+        "Upgrade every PHP runtime to 8.5.12, 8.4.27, 8.3.36 or 8.2.35 (or your vendor's patched build), prioritising internet-facing and mod_php systems.",
+        "Restart Apache, PHP-FPM and all long-running PHP workers after upgrading; updating WordPress/Drupal/your app does not update the PHP runtime.",
+        "Inventory PHP everywhere: containers, bundled runtimes, control panels and vendor appliances (PHP is often an invisible component).",
+        "PHP 8.1 and older receive no official fix: move to a supported branch or an LTS vendor backport.",
+        "If you cannot patch immediately, NSA, CISA and NCSC advise taking the system offline until it can be fully mitigated. A WAF only provides partial protection.",
+        "Temporary measures only (not a fix): session.upload_progress.enabled=0 (and fatal_error_backtraces=0 on 8.5) in php.ini / FPM pool / server config, not ini_set() or .user.ini; memory_limit=-1 set so apps cannot override it; low post_max_size and proxy request-size limits. Never use RLIMIT_AS / RLIMIT_DATA as a substitute.",
+        "Check for compromise before and after patching: look for web shells and modified files, and monitor PHP workers spawning shells or downloading tools.",
+        "Rotate credentials, tokens, API keys and certificates held by PHP applications that were exposed before patching, because CVE-2026-109619 can leak worker memory without executing code."
+      ],
+      "sources": [
+        { "name": "NSA Advisory: PHP Updates", "url": "https://www.nsa.gov/Press-Room/Press-Releases-Statements/Press-Release-View/Article/4630238/nsa-advisory-php-updates/" },
+        { "name": "CISA: Critical Vulnerabilities in PHP Require Immediate Patching", "url": "https://www.cisa.gov/news-events/alerts/2026/10/21/critical-vulnerabilities-php-require-immediate-patching" },
+        { "name": "PHP security advisory", "url": "https://www.php.net/archive/2026.php#2026-10-21-5" },
+        { "name": "GHSA-w8hw-w9fx-j79w (CVE-2026-109618)", "url": "https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w" },
+        { "name": "GHSA-6wmf-4rv5-p3rp (CVE-2026-109619)", "url": "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp" },
+        { "name": "UK NCSC: Critical security issue affecting PHP", "url": "https://www.ncsc.gov.uk/news/critical-security-issue-affecting-php" },
+        { "name": "CERT-EU Security Advisory 2026-018", "url": "https://cert.europa.eu/publications/security-advisories/2026-018" },
+        { "name": "NCSC-NL php2shell inventory", "url": "https://github.com/NCSC-NL/php2shell" },
+        { "name": "NSA: Detect and Prevent Web Shell Malware", "url": "https://media.defense.gov/2020/Jun/09/2002313081/-1/-1/0/CSI-DETECT-AND-PREVENT-WEB-SHELL-MALWARE-20200422.PDF" }
+      ]
+    }
+  ]
+}
